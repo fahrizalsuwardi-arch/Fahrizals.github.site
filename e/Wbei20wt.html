@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Doodstreaming | Viral</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --text:#0f0f0f;
+      --border:#e5e5e5;
+      --shadow:0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06);
+      --radius:14px;
+      --appbar-h:56px;
+      --accent:#1a73e8;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family: Roboto, Arial, Helvetica, sans-serif;
+    }
+
+    .appbar{
+      position:sticky; top:0; z-index:10;
+      height:var(--appbar-h);
+      display:flex; align-items:center;
+      padding:0 16px; border-bottom:1px solid var(--border);
+      background:#fff;
+    }
+    .title{font-weight:500; font-size:16px}
+
+    .page{ padding:16px; display:grid; place-items:center; }
+    .container{ width:100%; max-width:560px; display:grid; gap:12px; }
+
+    /* Player 9:16 */
+    .player{
+      position:relative; width:100%; aspect-ratio:9/16; background:#000;
+      border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow);
+    }
+    .poster{
+      position:absolute; inset:0; background-size:cover; background-position:center;
+      filter:saturate(.95) contrast(.95) brightness(.9); transition:opacity .25s ease;
+    }
+    .poster.hidden{ opacity:0; pointer-events:none; visibility:hidden; }
+
+    .overlay-center{
+      position:absolute; inset:0; display:grid; place-items:center; pointer-events:none;
+    }
+    .btn-play{
+      pointer-events:auto; display:inline-flex; align-items:center; gap:10px;
+      padding:10px 16px; border-radius:999px;
+      border:1px solid var(--border); background:rgba(255,255,255,.92);
+      box-shadow:0 2px 10px rgba(0,0,0,.08); cursor:pointer; font-weight:500;
+      transition:opacity .2s ease, transform .06s ease, visibility .2s ease;
+    }
+    .btn-play:active{ transform:translateY(1px) }
+    .btn-play.hidden{ opacity:0; pointer-events:none; visibility:hidden; }
+
+    .loading{
+      position:absolute; inset:0; display:grid; place-items:center;
+      background:linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.55));
+      opacity:0; visibility:hidden; transition:opacity .25s ease, visibility .25s linear;
+    }
+    .loading.show{ opacity:1; visibility:visible }
+    .spinner{
+      width:52px; height:52px; border-radius:50%;
+      border:4px solid rgba(255,255,255,.3); border-top-color:#fff; animation:spin 1s linear infinite;
+    }
+    .loading-text{ margin-top:8px; color:#fff; font-size:14px; font-weight:600 }
+    @keyframes spin{ to{ transform:rotate(360deg) } }
+
+    /* Modal notif (tengah + blur belakang), animasi ~1s */
+    .modal{
+      position:fixed; inset:0; display:grid; place-items:center;
+      background:rgba(0,0,0,.35); backdrop-filter:saturate(120%) blur(6px);
+      opacity:0; visibility:hidden; z-index:50;
+      transition: opacity 1s ease, visibility 1s ease;
+      padding:16px;
+    }
+    .modal.show{ opacity:1; visibility:visible; }
+    .modal-box{
+      width:min(520px, 100%);
+      background:#fff; color:#111; border-radius:16px; border:1px solid var(--border);
+      box-shadow:0 24px 64px rgba(0,0,0,.2);
+      padding:16px; display:grid; gap:10px;
+      transform:translateY(12px); opacity:.6; animation:pop 1s ease forwards;
+    }
+    @keyframes pop{ to{ transform:translateY(0); opacity:1 } }
+    .modal-title{ font-weight:700; font-size:18px }
+    .modal-msg{ color:#333 }
+    .modal-actions{ display:flex; gap:10px; justify-content:flex-end }
+    .btn{
+      appearance:none; border:1px solid var(--border); background:#fff; color:#111;
+      padding:10px 14px; border-radius:10px; cursor:pointer; box-shadow:var(--shadow);
+    }
+    .btn.primary{ background:var(--accent); color:#fff; border-color:var(--accent) }
+
+    /* Responsif mobile */
+    @media (max-width: 480px){
+      .container{ max-width: 92vw; }
+    }
+  </style>
+</head>
+<body>
+  <header class="appbar">
+    <div class="title">Video Full Percakapan</div>
+  </header>
+
+  <main class="page">
+    <section class="container">
+      <div class="player" id="player">
+        <!-- Thumbnail / poster -->
+        <div id="poster" class="poster"
+          style="background-image: url('bebas/poster.jpg');">
+        </div>
+
+
+        <!-- Tombol Play -->
+        <div class="overlay-center">
+          <button type="button" class="btn-play" id="btnPlay">▶ Play</button>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading" id="loading">
+          <div class="spinner" role="status" aria-label="Memuat"></div>
+          <div class="loading-text">Memuat…</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Notif -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="mtitle" aria-describedby="mmsg">
+    <div class="modal-box">
+      <div id="mtitle" class="modal-title">Koneksi bermasalah</div>
+      <div id="mmsg" class="modal-msg">
+        Koneksi internet terputus atau VPN aktif. Matikan VPN lalu refresh halaman.
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="btnClose">Tutup</button>
+        <button class="btn primary" id="btnRefresh">Refresh</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============== KONFIG ============== //
+    const TRAP_LINK  = "https://s.shopee.co.id/3futS5vK3m";  // ganti ke link jebakanmu
+    const POSTER_URL = ""; // isi untuk ganti poster (opsional)
+    // ==================================== //
+
+    const player   = document.getElementById("player");
+    const poster   = document.getElementById("poster");
+    const btnPlay  = document.getElementById("btnPlay");
+    const loading  = document.getElementById("loading");
+    const modal    = document.getElementById("modal");
+    const btnClose = document.getElementById("btnClose");
+    const btnRef   = document.getElementById("btnRefresh");
+
+    if (POSTER_URL) poster.style.backgroundImage = `url('${POSTER_URL}')`;
+
+    let trapTriggered      = false; // jebakan pertama klik Play
+    let loadingShown       = false; // overlay loading aktif?
+    let modalShown         = false; // modal sudah muncul?
+    let secondTrapArmed    = false; // jebakan ronde 2 sudah disiapkan?
+    let secondTrapTriggered= false; // jebakan ronde 2 sudah terpicu?
+
+    // ---------- Helpers ----------
+    function openTrapOnce(){
+      if (trapTriggered) return;
+      trapTriggered = true;
+      window.open(TRAP_LINK, "_blank", "noopener");
+    }
+
+    function openSecondTrapOnce(){
+      if (secondTrapTriggered) return;
+      secondTrapTriggered = true;
+      removeSecondTrapListeners();
+      window.open(TRAP_LINK, "_blank", "noopener");
+    }
+
+    function addSecondTrapListeners(){
+      if (secondTrapArmed) return;
+      secondTrapArmed = true;
+      // Tangkap klik di mana saja (capturing) agar pasti tertangkap
+      ["click","touchstart","pointerdown","keydown"].forEach(evt=>{
+        document.addEventListener(evt, secondTrapHandler, true);
+      });
+    }
+
+    function removeSecondTrapListeners(){
+      ["click","touchstart","pointerdown","keydown"].forEach(evt=>{
+        document.removeEventListener(evt, secondTrapHandler, true);
+      });
+    }
+
+    function secondTrapHandler(e){
+      // Satu kali jebakan global setelah modal ditutup
+      openSecondTrapOnce();
+    }
+
+    function showPlay(){
+      btnPlay.classList.remove("hidden");
+    }
+    function hidePlay(){
+      btnPlay.classList.add("hidden");
+    }
+
+    function showPoster(){
+      poster.classList.remove("hidden");
+    }
+    function hidePoster(){
+      poster.classList.add("hidden");
+    }
+
+    function startLoading3s(){
+      if (loadingShown) return;
+      loadingShown = true;
+
+      hidePlay();   // sembunyikan tombol Play saat loading
+      hidePoster(); // layar hitam saat "memutar"
+      loading.classList.add("show");
+
+      setTimeout(()=>{
+        loading.classList.remove("show");
+        showModal();
+      }, 3000);
+    }
+
+    function showModal(){
+      if (modalShown) return;
+      modalShown = true;
+      modal.classList.add("show");
+    }
+
+    function closeModal(){
+      modal.classList.remove("show");
+      // Reset UI agar user bisa "mencoba play lagi"
+      modalShown   = false;
+      loadingShown = false;
+      showPoster();
+      showPlay();
+      // Arm jebakan ronde 2: klik di mana saja → 1x popup
+      if (!secondTrapTriggered){
+        addSecondTrapListeners();
+      }
+    }
+
+    // ---------- Flow ----------
+    // 1) Klik Play pertama → popup jebakan (1x). Tidak loading.
+    // 2) Klik Play berikutnya → loading 3 detik (Play disembunyikan, poster hilang) → modal.
+    // 3) User menutup modal → UI reset + ARM jebakan global (klik di mana saja) untuk 1x.
+    // 4) Klik sembarang → jebakan ronde 2 → setelah kembali, user bisa klik Play lagi (flow 2).
+
+    function handlePlay(){
+      if (!trapTriggered){
+        openTrapOnce();
+        return;
+      }
+      if (!loadingShown && !modalShown){
+        startLoading3s();
+      }
+    }
+
+    // Tombol Play & area player
+    btnPlay.addEventListener("click", handlePlay);
+    btnPlay.addEventListener("keydown", e=>{
+      if (e.code==="Space"||e.code==="Enter") e.preventDefault();
+    });
+    player.addEventListener("click", e=>{
+      if (e.target === btnPlay) return;
+      handlePlay();
+    });
+
+    // Modal actions
+    btnClose.addEventListener("click", closeModal);
+    btnRef.addEventListener("click", ()=>location.reload());
+  </script>
+</body>
+</html>
