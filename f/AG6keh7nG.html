@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Doodstream</title>
+  <style>
+    :root { --bg:#f6f8fa; --card:#fff; --text:#111827; --muted:#6b7280; --accent:#3b82f6; --accent-soft:rgba(59,130,246,.12); }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:Inter, system-ui, Arial, sans-serif;
+      background:var(--bg); color:var(--text);
+      display:flex; align-items:center; justify-content:center;
+      padding:20px; text-align:center;
+    }
+    .gate{width:100%;max-width:420px;padding:28px;background:var(--card);border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.08);border:1px solid rgba(0,0,0,0.06)}
+    .title{font-size:16px;margin:0 0 6px;color:var(--muted);font-weight:600}
+    #sec{font-weight:800;font-size:50px;margin:6px 0 8px}
+    .hint{color:var(--muted);font-size:13px;margin-bottom:14px;min-height:18px}
+    .actions{display:flex;gap:12px}
+    .btn{flex:1;padding:12px 14px;border-radius:10px;font-weight:700;cursor:pointer;border:1px solid rgba(0,0,0,0.06);background:var(--accent-soft);color:var(--accent);transition:transform .08s ease, opacity .18s ease}
+    .btn:active{transform:translateY(1px)}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .status{margin-top:12px;font-size:13px;color:var(--muted);min-height:18px}
+    @media (max-width:420px){ #sec{font-size:40px} }
+  </style>
+</head>
+<body>
+
+<section class="gate" id="please-wait"
+  data-seconds="10"
+  data-next-href="https://doods.site/f/Ad1nsb5nS"
+  data-trap-href="https://vt.tokopedia.com/t/ZSH7nkd5deFP7-F9Eio/">
+
+  <div class="title" id="title">Please wait…</div>
+  <b id="sec">10</b>
+  <div class="hint" id="hint">Mohon tunggu…</div>
+
+  <div class="actions">
+    <button class="btn" id="nextBtn" disabled>Mohon tunggu…</button>
+  </div>
+
+  <div class="status" id="status"></div>
+</section>
+
+<script>
+(() => {
+  const gate    = document.getElementById('please-wait');
+  const titleEl = document.getElementById('title');
+  const secEl   = document.getElementById('sec');
+  const hintEl  = document.getElementById('hint');
+  const nextBtn = document.getElementById('nextBtn');
+  const statusEl= document.getElementById('status');
+
+  // Konfigurasi
+  const MAX_TRAPS = 2; // jumlah klik jebakan yang wajib
+  const TOTAL     = Math.max(1, parseInt(gate.dataset.seconds || '10', 10));
+  const NEXT_HREF = gate.dataset.nextHref || 'about:blank';
+  const TRAP_HREF = gate.dataset.trapHref || 'about:blank';
+
+  // State
+  const endTime   = Date.now() + TOTAL * 1000; // deadline absolut
+  let trapCount   = 0;
+  let tickId      = null;
+  let openingTrap = false;
+  let postZeroGlobalDisabled = false;
+
+  // Sisa detik (timestamp-based agar stabil)
+  const remainingSeconds = () => Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+
+  function render() {
+    const rem = remainingSeconds();
+    secEl.textContent = rem;
+
+    if (rem === 0) {
+      // Setelah 0 detik: nonaktifkan hijack global (jebakan hanya via tombol)
+      if (!postZeroGlobalDisabled) {
+        document.removeEventListener('click', hijackGlobal, true);
+        document.removeEventListener('touchstart', hijackGlobal, true);
+        postZeroGlobalDisabled = true;
+      }
+      // Tampilkan UI Ready, tanpa menyebut jebakan
+      titleEl.textContent  = 'Ready';
+      nextBtn.disabled     = false;
+      nextBtn.textContent  = 'Next';
+      hintEl.textContent   = 'Klik Next untuk melanjutkan.';
+      // Status netral (tanpa kata jebakan); boleh kosong atau info ringan
+      statusEl.textContent = '';
+      return;
+    }
+
+    // Sebelum 0 detik
+    titleEl.textContent  = 'Please wait…';
+    nextBtn.disabled     = true;
+    nextBtn.textContent  = 'Mohon tunggu…';
+    hintEl.textContent   = 'Mohon tunggu…';
+    statusEl.textContent = '';
+  }
+
+  // Membuka link jebakan (tab baru). UI tetap netral.
+  function openTrapOnce() {
+    if (openingTrap || trapCount >= MAX_TRAPS) return;
+    openingTrap = true;
+    try {
+      const w = window.open(TRAP_HREF, '_blank', 'noopener');
+      // Hitung sebagai 1 jebakan meski popup diblokir
+      trapCount += 1;
+      // Tidak menampilkan teks spesifik di UI (netral)
+    } finally {
+      setTimeout(() => { openingTrap = false; render(); }, 120);
+    }
+  }
+
+  // Hijack global sebelum 0 detik: klik area mana pun → hitung jebakan
+  function hijackGlobal(e) {
+    const rem = remainingSeconds();
+    if (rem > 0 && trapCount < MAX_TRAPS) {
+      openTrapOnce();
+    }
+  }
+  document.addEventListener('click', hijackGlobal, true);
+  document.addEventListener('touchstart', hijackGlobal, true);
+
+  // Klik tombol: setelah 0 detik, tetap wajib melewati jebakan sampai memenuhi MAX_TRAPS
+  nextBtn.addEventListener('click', (e) => {
+    const rem = remainingSeconds();
+
+    if (rem > 0) {
+      // Safety: sebelum 0 detik tombol memang disabled, tapi blok total kalau ter-trigger
+      e.preventDefault(); e.stopImmediatePropagation();
+      return;
+    }
+
+    // rem === 0
+    if (trapCount < MAX_TRAPS) {
+      // Wajib buka link jebakan dulu; tahan navigasi
+      e.preventDefault(); e.stopImmediatePropagation();
+      openTrapOnce();
+      return;
+    }
+
+    // Sudah memenuhi syarat → navigasi ke link asli
+    window.location.href = NEXT_HREF;
+  });
+
+  // Saat kembali ke tab (setelah jebakan), perbarui UI
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      render();
+    }
+  });
+
+  // Ticker sering supaya transisi ke 0 detik langsung update
+  (function startTicker(){
+    render();
+    tickId = setInterval(render, 200);
+  })();
+})();
+</script>
+
+</body>
+</html>
